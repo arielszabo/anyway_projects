@@ -180,3 +180,27 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
     print('{} frames took {}'.format(counter, datetime.datetime.now() - s))
 
 
+
+def main():
+
+    file_path = ''
+    start_frame = 0
+    end_frame = 100
+    file_output_path = ''
+    coco_net = pydarknet.Detector(config=bytes("cfg/yolov3.cfg", encoding="utf-8"),
+                                  weights=bytes("weights/yolov3.weights", encoding="utf-8"),
+                                  p=0,
+                                  meta=bytes("cfg/coco.data", encoding="utf-8"))
+    all_frames_bounds = find_all(video_path=file_path,
+                                 darknet_model=coco_net,
+                                 thresh=0.1,
+                                 class_label=['car', 'person', 'motorbike',
+                                              'truck', 'bus'],
+                                 start_frame=start_frame,
+                                 end_frame=end_frame)
+
+    blur_the_video(video_path=file_path,
+                   output_path=file_output_path,
+                   frames_bounds=all_frames_bounds,
+                   start_frame=start_frame,
+                   end_frame=end_frame)
