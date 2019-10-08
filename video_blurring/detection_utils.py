@@ -15,13 +15,15 @@ def main():
         videos_config = yaml.load(yamlfile)
 
     input_videos_folder_path = videos_config["input_videos_folder_path"]
+    output_folder_path = videos_config["output_folder_path"]
+    os.makedirs(output_folder_path, exist_ok=True)
 
     for video in videos_config["videos"]:
         video_full_path = os.path.join(input_videos_folder_path, video["name"])
         output_video_full_path = _get_video_output_full_path(video_name=video["name"],
                                                              video_start_frame=video["start_frame"],
                                                              video_end_frame=video["end_frame"],
-                                                             output_folder_path=videos_config["output_folder_path"])
+                                                             output_folder_path=output_folder_path)
 
         run(input_video_path=video_full_path,
             start_frame=video["start_frame"],

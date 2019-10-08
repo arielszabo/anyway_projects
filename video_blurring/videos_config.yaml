@@ -1,4 +1,4 @@
-input_videos_folder_path: "/home/ariel/Downloads/"
+input_videos_folder_path: "/home/ariel/Downloads/drive-download-20191008T163953Z-001"
 
 
 videos:
@@ -9,9 +9,9 @@ videos:
 
 
   # video number 2
-  - name: "VID_20190530_081812.mp4"
-    start_frame: 0
+  - name: "Gtd8Rkd9JIc.mp4"
+    start_frame: 80
     end_frame:  # if no end_frame is specified the blurring will run until its ending
 
 
-output_folder_path: "/home/ariel/Downloads/outs"
+output_folder_path: "/home/ariel/Downloads/drive-download-20191008T163953Z-001/outs"
