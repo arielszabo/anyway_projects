@@ -1,2 +1,5 @@
-cv2
-pydarknet
+opencv-python
+tqdm
+pyyaml
+yolo34py
+yolo34py-gpu
