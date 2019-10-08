@@ -1,12 +1,12 @@
 import os
+import yaml
 import cv2
 import pydarknet
-import datetime
 from tqdm import tqdm
 
 DETECTION_THRESHOLD = 0.1
+BOUND_RATIO_THRESHOLD = 0.5
 CLASS_LABELS = ['car', 'person', 'motorbike', 'truck', 'bus']
-file_path = '/home/ariel/Downloads/VID_20190530_081812.mp4'
 
 
 def _get_box_size_ratio(y1, y2, x1, x2, image_shape):
@@ -72,12 +72,11 @@ def add_blur(image_frame, results_bounds, expand=False):
     return image_frame
 
 
-def find_bounds_in_image(image_frame, darknet_model, class_label, thresh=0.5,
-                         bound_ratio_thresh=0.5):
+def find_bounds_in_image(image_frame, darknet_model, class_label):
     darknet_image_frame = pydarknet.Image(image_frame)
 
     results = darknet_model.detect(darknet_image_frame,
-                                   thresh=thresh,  # 0.00051,
+                                   thresh=DETECTION_THRESHOLD,
                                    hier_thresh=.5, nms=.45)  # todo: change this thresh-params thresh=0.01 #0.00051,
     results_bounds = []
     for category, score, bounds in results:
@@ -88,13 +87,13 @@ def find_bounds_in_image(image_frame, darknet_model, class_label, thresh=0.5,
             x1, x2 = int(x - w / 2), int(x + w / 2)
 
             image_box_size_ratio = _get_box_size_ratio(y1, y2, x1, x2, image_shape=image_frame.shape)
-            if image_box_size_ratio < bound_ratio_thresh:
+            if image_box_size_ratio < BOUND_RATIO_THRESHOLD:
                 results_bounds.append((y1, y2, x1, x2))
 
     return results_bounds
 
 
-def find_all(video_path, darknet_model, thresh,
+def find_all(video_path, darknet_model,
              class_labels, start_frame=0,
              end_frame=None):
     video_capture = cv2.VideoCapture(video_path)
@@ -113,8 +112,7 @@ def find_all(video_path, darknet_model, thresh,
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # todo: is this a must ?
                 frame_results_bounds = find_bounds_in_image(image_frame=frame,
                                                             darknet_model=darknet_model,
-                                                            class_label=class_labels,
-                                                            thresh=thresh)
+                                                            class_label=class_labels)
                 frames_bounds.append(frame_results_bounds)
             frame_counter += 1
             progress_bar.update(1)
@@ -155,7 +153,7 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
                     # todo: add this a param and put the bounds from the loop
                     for i in range(-1, 2):
                         real_index = frame_counter - start_frame
-                        if real_index + i >= 0 and real_index + i < len(frames_bounds):
+                        if 0 <= real_index + i < len(frames_bounds):
                             bounds = frames_bounds[real_index + i]
 
                             frame = add_blur(frame,
@@ -183,27 +181,59 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
     cv2.destroyAllWindows()
 
 
-def main():
-    start_frame = 0
-    end_frame = None
-    file_output_path = '/home/ariel/Downloads/VID_20190530_081812_OUT.mp4'
+def run(input_video_path, start_frame, end_frame, output_video_path):
     coco_net = pydarknet.Detector(config=bytes("cfg/yolov3.cfg", encoding="utf-8"),
                                   weights=bytes("weights/yolov3.weights", encoding="utf-8"),
                                   p=0,
                                   meta=bytes("cfg/coco.data", encoding="utf-8"))
-    all_frames_bounds = find_all(video_path=file_path,
+    all_frames_bounds = find_all(video_path=input_video_path,
                                  darknet_model=coco_net,
-                                 thresh=DETECTION_THRESHOLD,
                                  class_labels=CLASS_LABELS,
                                  start_frame=start_frame,
                                  end_frame=end_frame)
 
-    blur_the_video(video_path=file_path,
-                   output_path=file_output_path,
+    blur_the_video(video_path=input_video_path,
+                   output_path=output_video_path,
                    frames_bounds=all_frames_bounds,
                    start_frame=start_frame,
                    end_frame=end_frame)
 
 
+def get_video_name_and_extension(video_name):
+    """
+    Split the video name  todo: explain this better
+    """
+    reverse_video_name = video_name[::-1]
+
+    reversed_ending, reversed_beginning = reverse_video_name.split(".", maxsplit=1)
+    return reversed_beginning[::-1], reversed_ending[::-1]
+
+
+def get_video_output_full_path(video_name, video_start_frame, video_end_frame, output_folder_path):
+    core_video_name, video_extension = get_video_name_and_extension(video_name)
+    if video_end_frame is None:
+        frames_signature = str(video_start_frame)
+    else:
+        frames_signature = f"{video_start_frame}_{video_end_frame}"
+    output_video_name = f"{core_video_name}_{frames_signature}.{video_extension}"
+    output_full_path = os.path.join(output_folder_path, output_video_name)
+    return output_full_path
+
+
 if __name__ == '__main__':
-    main()
+    with open("videos_config.yaml", "r") as yamlfile:
+        videos_config = yaml.load(yamlfile)
+
+    input_videos_folder_path = videos_config["input_videos_folder_path"]
+
+    for video in videos_config["videos"]:
+        video_full_path = os.path.join(input_videos_folder_path, video["name"])
+        output_video_full_path = get_video_output_full_path(video_name=video["name"],
+                                                            video_start_frame=video["start_frame"],
+                                                            video_end_frame=video["end_frame"],
+                                                            output_folder_path=videos_config["output_folder_path"])
+
+        run(input_video_path=video_full_path,
+            start_frame=video["start_frame"],
+            end_frame=video["end_frame"],
+            output_video_path=output_video_full_path)
