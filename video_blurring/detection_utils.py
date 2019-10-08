@@ -4,6 +4,10 @@ import pydarknet
 import datetime
 from tqdm import tqdm
 
+DETECTION_THRESHOLD = 0.1
+CLASS_LABELS = ['car', 'person', 'motorbike', 'truck', 'bus']
+file_path = '/home/ariel/Downloads/VID_20190530_081812.mp4'
+
 
 def _get_box_size_ratio(y1, y2, x1, x2, image_shape):
     return (abs(y2 - y1) * abs(x2 - x1)) / (image_shape[0] * image_shape[1])
@@ -98,7 +102,7 @@ def find_all(video_path, darknet_model, thresh,
     if end_frame is None:
         end_frame = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
-    progress_bar = tqdm(total=end_frame-start_frame)
+    progress_bar = tqdm(total=end_frame-start_frame, desc="Detect and find")
     frame_counter = 0
     frames_bounds = []
     while video_capture.isOpened():
@@ -140,7 +144,7 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
 
         output = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-        progress_bar = tqdm(total=end_frame - start_frame)
+        progress_bar = tqdm(total=end_frame - start_frame, desc="Blur found boundaries")
         frame_counter = 0
         while cap.isOpened():
             ret, frame = cap.read()
@@ -180,9 +184,6 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
 
 
 def main():
-    DETECTION_THRESHOLD = 0.1
-    CLASS_LABELS = ['car', 'person', 'motorbike', 'truck', 'bus']
-    file_path = '/home/ariel/Downloads/VID_20190530_081812.mp4'
     start_frame = 0
     end_frame = None
     file_output_path = '/home/ariel/Downloads/VID_20190530_081812_OUT.mp4'
@@ -190,7 +191,6 @@ def main():
                                   weights=bytes("weights/yolov3.weights", encoding="utf-8"),
                                   p=0,
                                   meta=bytes("cfg/coco.data", encoding="utf-8"))
-    print("Hello")
     all_frames_bounds = find_all(video_path=file_path,
                                  darknet_model=coco_net,
                                  thresh=DETECTION_THRESHOLD,
