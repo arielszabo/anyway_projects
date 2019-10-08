@@ -1,6 +1,8 @@
+import os
 import cv2
 import pydarknet
 import datetime
+from tqdm import tqdm
 
 
 def _get_box_size_ratio(y1, y2, x1, x2, image_shape):
@@ -89,48 +91,44 @@ def find_bounds_in_image(image_frame, darknet_model, class_label, thresh=0.5,
 
 
 def find_all(video_path, darknet_model, thresh,
-             class_label, start_frame=0,
+             class_labels, start_frame=0,
              end_frame=None):
-    s = datetime.datetime.now()
     video_capture = cv2.VideoCapture(video_path)
 
     if end_frame is None:
         end_frame = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
-    counter = 0
+    progress_bar = tqdm(total=end_frame-start_frame)
+    frame_counter = 0
     frames_bounds = []
     while video_capture.isOpened():
         ret, frame = video_capture.read()
         if ret:
-            if end_frame > counter > start_frame:
-
-                if counter % 100 == 0:
-                    print('{} frames processed after {}'.format(counter,
-                                                                datetime.datetime.now() - s))
+            if end_frame > frame_counter > start_frame:
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # todo: is this a must ?
                 frame_results_bounds = find_bounds_in_image(image_frame=frame,
                                                             darknet_model=darknet_model,
-                                                            class_label=class_label,
+                                                            class_label=class_labels,
                                                             thresh=thresh)
                 frames_bounds.append(frame_results_bounds)
-            counter += 1
+            frame_counter += 1
+            progress_bar.update(1)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         else:
             break
 
+    progress_bar.close()
     # Release everything if job is finished
     video_capture.release()
     cv2.destroyAllWindows()
-    print('all frames took {}'.format(datetime.datetime.now() - s))
     return frames_bounds
 
 
 def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
                    end_frame=None):
-    s = datetime.datetime.now()
     cap = cv2.VideoCapture(video_path)
 
     if cap.isOpened():
@@ -142,16 +140,17 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
 
         output = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-        counter = 0
+        progress_bar = tqdm(total=end_frame - start_frame)
+        frame_counter = 0
         while cap.isOpened():
             ret, frame = cap.read()
             if ret:
-                if end_frame > counter > start_frame:
+                if end_frame > frame_counter > start_frame:
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
                     # todo: add this a param and put the bounds from the loop
                     for i in range(-1, 2):
-                        real_index = counter - start_frame
+                        real_index = frame_counter - start_frame
                         if real_index + i >= 0 and real_index + i < len(frames_bounds):
                             bounds = frames_bounds[real_index + i]
 
@@ -163,39 +162,39 @@ def blur_the_video(video_path, output_path, frames_bounds, start_frame=0,
 
                     output.write(new_frame)
 
-                    if counter % int(fps) == 0:
-                        print('{} seconds processed after {}'.format(
-                            counter / int(fps), datetime.datetime.now() - s))
-
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-                counter += 1
+
+                frame_counter += 1
+                progress_bar.update(1)
 
             else:
                 break
-    # Release everything if job is finished
-    cap.release()
-    output.release()
-    cv2.destroyAllWindows()
-    print('{} frames took {}'.format(counter, datetime.datetime.now() - s))
 
+        progress_bar.close()
+        # Release everything if job is finished
+        output.release()
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 def main():
-
-    file_path = ''
+    DETECTION_THRESHOLD = 0.1
+    CLASS_LABELS = ['car', 'person', 'motorbike', 'truck', 'bus']
+    file_path = '/home/ariel/Downloads/VID_20190530_081812.mp4'
     start_frame = 0
-    end_frame = 100
-    file_output_path = ''
+    end_frame = None
+    file_output_path = '/home/ariel/Downloads/VID_20190530_081812_OUT.mp4'
     coco_net = pydarknet.Detector(config=bytes("cfg/yolov3.cfg", encoding="utf-8"),
                                   weights=bytes("weights/yolov3.weights", encoding="utf-8"),
                                   p=0,
                                   meta=bytes("cfg/coco.data", encoding="utf-8"))
+    print("Hello")
     all_frames_bounds = find_all(video_path=file_path,
                                  darknet_model=coco_net,
-                                 thresh=0.1,
-                                 class_label=['car', 'person', 'motorbike',
-                                              'truck', 'bus'],
+                                 thresh=DETECTION_THRESHOLD,
+                                 class_labels=CLASS_LABELS,
                                  start_frame=start_frame,
                                  end_frame=end_frame)
 
@@ -204,3 +203,7 @@ def main():
                    frames_bounds=all_frames_bounds,
                    start_frame=start_frame,
                    end_frame=end_frame)
+
+
+if __name__ == '__main__':
+    main()
